@@ -1,71 +1,160 @@
-// Original code by Jasper Flick. Catlike Coding. 2019. https://catlikecoding.com/unity/tutorials/movement
-// The code is licensed under the MIT-0 license.
-// BitBucket repo at: https://bitbucket.org/catlikecodingunitytutorials/movement-01-sliding-a-sphere/src/master/
-// Adapted and modified by Christian Holm Christensen. October 14th, 2022. 
+/*
+ * Original code by Jasper Flick. Catlike Coding. 2019. https://catlikecoding.com/unity/tutorials/movement
+ * Original code licensed under the MIT-0 license:      https://catlikecoding.com/unity/tutorials/license/
+ * BitBucket repo at:                                   https://bitbucket.org/catlikecodingunitytutorials/movement-01-sliding-a-sphere/src/master/
+ * Adapted and modified by Christian Holm Christensen. October 16th, 2022. 
+*/
 
-using System;
+using EditorTools;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
+[RequireComponent(typeof(Rigidbody))]
 public class MovingSphere : MonoBehaviour
 {
-    [Header("Settings")]
-    [SerializeField, Range(0f, 1f)] float bounciness = .5f;
-    [SerializeField, Range(0f, 100f)] float maxAcceleration = 10f;
+    [Header("SETTINGS")]
+    [Header("> Locomotion")]
+    [Header(">> On Ground")]
+    [SerializeField, Range(0f, 90f)] float maxGroundAngle = 25f;
     [SerializeField, Range(0f, 100f)] float maxSpeed = 10f;
-    [SerializeField] Rect allowedArea = new (-4.5f, -4.5f, 9f, 9f);
-    
-    [Space, Header("Scriptable Objects")]    
+    [SerializeField, Range(0f, 100f)] float maxGroundAcceleration = 10f;
+    [Space]
+    [Header(">> In Air")]
+    [SerializeField, Range(0, 10)] int maxAirJumps;
+    [SerializeField, Range(0f, 10f)] float jumpHeight = 2f;
+    [SerializeField, Range(0f, 100f)] float maxAirAcceleration = 1f;
+    [Space]
+    [Header("SCRIPTABLE OBJECTS")]    
     [SerializeField] InputReader inputReader;
-    
-    Vector2 moveInputVector;
-    Vector3 velocity;
-    
+    [Space]
+    [Header("DEBUG")]
+    [CHCReadOnly] public int jumpPhase;
+    [CHCReadOnly] public int groundContactCount;
+    [CHCReadOnly] public bool hasJumpInput;
+    [CHCReadOnly] public float minGroundDotProduct;
+    [CHCReadOnly] public Vector2 moveInputVector;
+    [CHCReadOnly] public Vector3 desiredVelocity;
+    [CHCReadOnly] public Vector3 velocity;
+    [CHCReadOnly] public Vector3 contactNormal;
+        
+    Rigidbody body;
+
+    bool OnGround => groundContactCount > 0;
+
     void OnEnable()
     {
-        inputReader.MoveInput += vector => moveInputVector = vector;
+        inputReader.MoveInputEvent += vector => moveInputVector = vector;
+        inputReader.JumpInputEvent += OnJumpInput;
+        inputReader.JumpInputCancelledEvent += OnJumpInputCancelled;
+    }
+
+    void OnValidate()
+    {
+        minGroundDotProduct = Mathf.Cos(maxGroundAngle * Mathf.Deg2Rad);
+    }
+
+    void Awake()
+    {
+        body = GetComponent<Rigidbody>();
+        OnValidate();
     }
 
     void Update()
     {
-        MoveSphere();
+        moveInputVector = Vector2.ClampMagnitude(moveInputVector, maxLength: 1f);
+        desiredVelocity = new Vector3(moveInputVector.x, 0f, moveInputVector.y) * maxSpeed;
     }
 
-    void MoveSphere()
+    void FixedUpdate()
     {
-        moveInputVector = Vector2.ClampMagnitude(moveInputVector, maxLength: 1f);
+        UpdateState();
+        AdjustVelocity();
+        HandleJumping();
         
-        Vector3 desiredVelocity = new Vector3(moveInputVector.x, 0f, moveInputVector.y) * maxSpeed;
-        float maxSpeedChange = maxAcceleration * Time.deltaTime;
+        body.velocity = velocity;
         
-        velocity.x = Mathf.MoveTowards(velocity.x, desiredVelocity.x, maxSpeedChange);
-        velocity.z = Mathf.MoveTowards(velocity.z, desiredVelocity.z, maxSpeedChange);
+        ClearState();
+    }
 
-        Vector3 displacement = velocity * Time.deltaTime;
-        Vector3 new3DPosition = transform.localPosition + displacement;
+    void ClearState()
+    {
+        groundContactCount = 0;
+        contactNormal = Vector3.zero;
+    }
+
+    void UpdateState()
+    {
+        velocity = body.velocity;
         
-        if (new3DPosition.x < allowedArea.xMin)
+        if(OnGround)
         {
-            new3DPosition.x = allowedArea.xMin;
-            velocity.x = -velocity.x * bounciness;
+            jumpPhase = 0;
+            if(groundContactCount > 1)
+                contactNormal.Normalize();
         }
-        else if (new3DPosition.x > allowedArea.xMax)
-        {
-            new3DPosition.x = allowedArea.xMax;
-            velocity.x = -velocity.x * bounciness;
-        }
+        else
+            contactNormal = Vector3.up;
+    }
+    
+    void HandleJumping()
+    {
+        if (!hasJumpInput) return;
+        hasJumpInput = false;
+        Jump();
+    }
+
+    void Jump()
+    {
+        if (!OnGround && jumpPhase >= maxAirJumps) return;
         
-        if (new3DPosition.z < allowedArea.yMin)
-        {
-            new3DPosition.z = allowedArea.yMin;
-            velocity.z = -velocity.z * bounciness;
-        }
-        else if (new3DPosition.z > allowedArea.yMax)
-        {
-            new3DPosition.z = allowedArea.yMax;
-            velocity.z = -velocity.z * bounciness;
-        }
+        jumpPhase += 1;
+        float jumpSpeed = Mathf.Sqrt(-2f * Physics.gravity.y * jumpHeight);
+        float alignedSpeed = Vector3.Dot(velocity, contactNormal);
+
+        if(alignedSpeed > 0f)
+            jumpSpeed = Mathf.Max(jumpSpeed - alignedSpeed, 0f);
         
-        transform.localPosition = new3DPosition;
+        velocity += contactNormal * jumpSpeed;
+    }
+
+    void AdjustVelocity()
+    {
+        Vector3 xAxis = ProjectOnContactPlane(Vector3.right).normalized;
+        Vector3 zAxis = ProjectOnContactPlane(Vector3.forward).normalized;
+        
+        float currentX = Vector3.Dot(velocity, xAxis);
+        float currentZ = Vector3.Dot(velocity, zAxis);
+        
+        float acceleration = OnGround ? maxGroundAcceleration : maxAirAcceleration;
+        float maxSpeedChange = acceleration * Time.deltaTime;
+
+        float newX = Mathf.MoveTowards(currentX, desiredVelocity.x, maxSpeedChange);
+        float newZ = Mathf.MoveTowards(currentZ, desiredVelocity.z, maxSpeedChange);
+
+        velocity += xAxis * (newX - currentX) + zAxis * (newZ - currentZ);
+    }
+
+    Vector3 ProjectOnContactPlane(Vector3 vector) => vector - contactNormal * Vector3.Dot(vector, contactNormal);
+    
+    void OnJumpInput() => hasJumpInput = true;
+    void OnJumpInputCancelled() => hasJumpInput = false;
+
+    void OnCollisionEnter(Collision collision) => EvaluateCollision(collision);
+    void OnCollisionStay(Collision collision) => EvaluateCollision(collision);
+    void EvaluateCollision(Collision collision)
+    {
+        for (int i = 0; i < collision.contactCount; i++)
+        {
+            Vector3 normal = collision.GetContact(i).normal;
+            if (normal.y < minGroundDotProduct) continue;
+            
+            groundContactCount += 1;
+            contactNormal += normal;
+        }
+    }
+
+    void OnDisable()
+    {
+        inputReader.JumpInputEvent -= OnJumpInput;
+        inputReader.JumpInputCancelledEvent -= OnJumpInputCancelled;
     }
 }
