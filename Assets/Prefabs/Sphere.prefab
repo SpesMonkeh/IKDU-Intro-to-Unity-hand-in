@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 4393976258829771774}
   - component: {fileID: 2113504836753612511}
   - component: {fileID: 7568280812844249600}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: Sphere
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -30,7 +30,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5501992689293305859}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 33, y: 0.5, z: -13}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -130,15 +130,32 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxSpeed: 10
   maxGroundAcceleration: 10
-  maxAirAcceleration: 0
+  groundContactCount: 0
+  moveInputVector: {x: 0, y: 0}
+  desiredVelocity: {x: 0, y: 0, z: 0}
+  velocity: {x: 0, y: 0, z: 0}
+  contactNormal: {x: 0, y: 0, z: 0}
+  maxGroundAngle: 25
+  maxStairAngle: 50
+  minGroundDotProduct: 0.90630776
+  minStairDotProduct: 0.64278764
+  maxSnapToGroundSpeed: 100
+  snapToGroundProbeDistance: 1
+  groundProbeMask:
+    serializedVersion: 2
+    m_Bits: 2099
+  stairProbeMask:
+    serializedVersion: 2
+    m_Bits: 2048
+  jumpingPhysicsStepsSinceLast: 0
+  groundedPhysicsStepsSinceLast: 0
   maxAirJumps: 0
   jumpHeight: 2.65
-  inputReader: {fileID: 11400000, guid: 28950890176bbdb49a5aa982e290eb14, type: 2}
+  maxAirAcceleration: 0
   jumpPhase: 0
   hasJumpInput: 0
-  onGround: 0
-  moveInputVector: {x: 0, y: 0}
-  velocity: {x: 0, y: 0, z: 0}
+  inputReader: {fileID: 11400000, guid: 28950890176bbdb49a5aa982e290eb14, type: 2}
+  body: {fileID: 0}
 --- !u!96 &7568280812844249600
 TrailRenderer:
   serializedVersion: 3
