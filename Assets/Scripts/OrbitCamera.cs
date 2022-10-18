@@ -17,14 +17,30 @@ public class OrbitCamera : MonoBehaviour
 
 	[Header("> Orbit")]
 	[SerializeField, Min(0f)] float alignmentDelay = 5f;
+	[SerializeField, Range(0f, 90f)] float alignmentSmoothRange = 45f;
 	[SerializeField, Range(1f, 360f)] float rotationSpeed = 90f;
 	[SerializeField, Range(-89f, 89f)] float minVerticalAngle = -30f;
 	[SerializeField, Range(-89f, 89f)] float maxVerticalAngle = 60f;
+	[SerializeField] LayerMask obstructionMask = -1;
 	[CHCReadOnly] public float lastManualRotationTime;
 	[CHCReadOnly] public Vector2 mouseInput;
 
 	[Header("SCRIPTABLE OBJECTS")]    
 	[SerializeField] InputReader inputReader;
+
+	Camera regularCamera;
+
+	Vector3 CameraHalfExtends
+	{
+		get
+		{
+			Vector3 halfExtends;
+			halfExtends.y = regularCamera.nearClipPlane * Mathf.Tan(.5f * Mathf.Deg2Rad * regularCamera.fieldOfView);
+			halfExtends.x = halfExtends.y * regularCamera.aspect;
+			halfExtends.z = 0f;
+			return halfExtends;
+		}
+	}
 	
 	void OnValidate()
 	{
@@ -34,11 +50,12 @@ public class OrbitCamera : MonoBehaviour
 
 	void OnEnable()
 	{
-		inputReader.MouseInputEvent += vector => mouseInput = new Vector2(vector.y, vector.x);
+		inputReader.MouseInputEvent += vector => mouseInput.Set(vector.y, vector.x);
 	}
 
 	void Awake()
 	{
+		regularCamera = GetComponent<Camera>();
 		focusPoint = focusObject.position;
 		transform.localRotation = Quaternion.Euler(orbitAngles);
 	}
@@ -56,9 +73,37 @@ public class OrbitCamera : MonoBehaviour
 		else
 			lookRotation = transform.localRotation;
 
-		Vector3 lookDirection = lookRotation * Vector3.forward;
-		Vector3 lookPosition = focusPoint - lookDirection * cameraDistance;
+		CheckForOrbitObstruction(in lookRotation, out Vector3 lookPosition);
+		
 		transform.SetPositionAndRotation(lookPosition, lookRotation);
+	}
+
+	void CheckForOrbitObstruction(in Quaternion lookRotation, out Vector3 lookPosition)
+	{
+		Vector3 lookDirection = lookRotation * Vector3.forward;
+		
+		lookPosition = focusPoint - lookDirection * cameraDistance;
+
+		Vector3 rectOffset = lookDirection * regularCamera.nearClipPlane;
+		Vector3 rectPosition = lookPosition + rectOffset;
+		Vector3 castFrom = focusObject.position;
+		Vector3 castLine = rectPosition - castFrom;
+		float castDistance = castLine.magnitude;
+		Vector3 castDirection = castLine / castDistance;
+		
+		bool orbitIsObstructed = Physics.BoxCast(
+			center: castFrom,
+			halfExtents: CameraHalfExtends,
+			direction: castDirection,
+			hitInfo: out RaycastHit hit,
+			orientation: lookRotation,
+			maxDistance: castDistance,
+			layerMask: obstructionMask);
+
+		if (!orbitIsObstructed) return;
+		
+		rectPosition = castFrom + castDirection * hit.distance;
+		lookPosition = rectPosition - rectOffset;
 	}
 
 	void UpdateFocusPoint()
@@ -111,8 +156,15 @@ public class OrbitCamera : MonoBehaviour
 		if (movementDeltaSquared < .0001f) return false;
 
 		float headingAngle = GetAngle(movement / Mathf.Sqrt(movementDeltaSquared));
-		orbitAngles.y = headingAngle;
+		float deltaAbsolute = Mathf.Abs(Mathf.DeltaAngle(orbitAngles.y, headingAngle));
+		float rotationChange = rotationSpeed * Mathf.Min(Time.unscaledDeltaTime, movementDeltaSquared);
+
+		if (deltaAbsolute < alignmentSmoothRange)
+			rotationChange *= deltaAbsolute / alignmentSmoothRange;
+		else if (180f - deltaAbsolute < alignmentSmoothRange)
+			rotationChange *= (180f - deltaAbsolute) / alignmentSmoothRange;
 		
+		orbitAngles.y = Mathf.MoveTowardsAngle(orbitAngles.y, headingAngle, rotationChange);
 		return true;
 	}
 	

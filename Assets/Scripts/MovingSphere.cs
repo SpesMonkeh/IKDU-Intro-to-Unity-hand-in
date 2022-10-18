@@ -57,9 +57,10 @@ public class MovingSphere : MonoBehaviour
     [SerializeField, Range(0f, 100f)] float maxAirAcceleration = 1f;
     [CHCReadOnly] public int jumpPhase;
     [CHCReadOnly] public bool hasJumpInput;
+
     [Space]
-    
-    [Header("SCRIPTABLE OBJECTS")]    
+    [Header("INPUT")]
+    [SerializeField] Transform playerInputSpace;
     [SerializeField] InputReader inputReader;
     
     Rigidbody body;
@@ -69,7 +70,7 @@ public class MovingSphere : MonoBehaviour
     bool AirJumpingIsAllowed => maxAirJumps > 0;
     void OnEnable()
     {
-        inputReader.MoveInputEvent += vector => moveInput = vector;
+        inputReader.MoveInputEvent += vector => moveInput.Set(vector.x, vector.y);
         inputReader.JumpInputEvent += OnJumpInput;
         inputReader.JumpInputCancelledEvent += OnJumpInputCancelled;
     }
@@ -89,7 +90,21 @@ public class MovingSphere : MonoBehaviour
     void Update()
     {
         moveInput = Vector2.ClampMagnitude(moveInput, maxLength: 1f);
-        desiredVelocity = new Vector3(moveInput.x, 0f, moveInput.y) * maxSpeed;
+
+        if (playerInputSpace)
+        {
+            Vector3 forward = playerInputSpace.forward;
+            forward.y = 0f;
+            forward.Normalize();
+
+            Vector3 right = playerInputSpace.right;
+            right.y = 0f;
+            right.Normalize();
+            
+            desiredVelocity = (forward * moveInput.y + right * moveInput.x) * maxSpeed;
+        }
+        else 
+            desiredVelocity = new Vector3(moveInput.x, 0f, moveInput.y) * maxSpeed;
     }
 
     void FixedUpdate()
