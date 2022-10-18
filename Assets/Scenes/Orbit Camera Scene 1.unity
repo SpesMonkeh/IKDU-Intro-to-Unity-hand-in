@@ -134,6 +134,7 @@ GameObject:
   - component: {fileID: 340101757}
   - component: {fileID: 340101756}
   - component: {fileID: 340101758}
+  - component: {fileID: 340101759}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -191,14 +192,14 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 340101754}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1, z: -10}
+  m_LocalRotation: {x: 0.38268343, y: 0, z: 0, w: 0.92387956}
+  m_LocalPosition: {x: 0, y: 4.04, z: -3.54}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 0
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 45, y: 0, z: 0}
 --- !u!114 &340101758
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -232,6 +233,22 @@ MonoBehaviour:
   m_RequiresDepthTexture: 0
   m_RequiresColorTexture: 0
   m_Version: 2
+--- !u!114 &340101759
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 340101754}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b1c0cc4fe44141a8b78fb9a3cef97d8d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cameraDistance: 5
+  focusObject: {fileID: 1013500578}
+  focusRadius: 1
+  focusPoint: {x: 0, y: 0, z: 0}
 --- !u!1 &434908958
 GameObject:
   m_ObjectHideFlags: 0
@@ -347,6 +364,12 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_LightCookieSize: {x: 1, y: 1}
   m_LightCookieOffset: {x: 0, y: 0}
+--- !u!4 &1013500578 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 183567894200905800, guid: 3fd271fa97b0ac84bb880e983d4c0fe2,
+    type: 3}
+  m_PrefabInstance: {fileID: 3195121646011789808}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1674312074
 GameObject:
   m_ObjectHideFlags: 0

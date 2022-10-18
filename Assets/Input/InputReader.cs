@@ -8,7 +8,8 @@ using UnityEngine.InputSystem.Interactions;
 public class InputReader : ScriptableObject, PlayerControls.IPlayerActions
 {
 	[Header("DEBUG")]
-	[CHCReadOnly, SerializeField] Vector2 moveInputVector2;
+	[CHCReadOnly, SerializeField] Vector2 moveInput;
+	[CHCReadOnly, SerializeField] Vector2 mouseInput;
 
 
 	PlayerControls playerControls;
@@ -16,6 +17,7 @@ public class InputReader : ScriptableObject, PlayerControls.IPlayerActions
 	public event Action JumpInputEvent = delegate { };
 	public event Action JumpInputCancelledEvent = delegate { };
 	public event Action<Vector2> MoveInputEvent = delegate { };
+	public event Action<Vector2> MouseInputEvent = delegate { };
 	
 	void OnEnable()
 	{
@@ -31,14 +33,18 @@ public class InputReader : ScriptableObject, PlayerControls.IPlayerActions
 
 	public void OnMove(InputAction.CallbackContext context)
 	{
-		moveInputVector2 = context.performed 
+		moveInput = context.performed 
 			? context.ReadValue<Vector2>() 
 			: Vector2.zero;
-		MoveInputEvent?.Invoke(moveInputVector2);
+		MoveInputEvent?.Invoke(moveInput);
 	}
 
 	public void OnLook(InputAction.CallbackContext context)
 	{
+		mouseInput = context.performed
+			? context.ReadValue<Vector2>()
+			: Vector2.zero;
+		MouseInputEvent?.Invoke(mouseInput);
 	}
 
 	public void OnFire(InputAction.CallbackContext context)

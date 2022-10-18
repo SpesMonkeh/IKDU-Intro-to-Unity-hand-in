@@ -29,10 +29,11 @@ public class MovingSphere : MonoBehaviour
     [SerializeField, Range(0f, 100f)] float maxSpeed = 10f;
     [SerializeField, Range(0f, 100f)] float maxGroundAcceleration = 10f;
     [CHCReadOnly] public int groundContactCount;
-    [CHCReadOnly] public Vector2 moveInputVector;
+    [CHCReadOnly] public Vector2 moveInput;
     [CHCReadOnly] public Vector3 desiredVelocity;
     [CHCReadOnly] public Vector3 velocity;
     [CHCReadOnly] public Vector3 groundContactNormal;
+    
     [Header(">>> Movement Angles")]
     [SerializeField, Range(0f, 90f)] float maxGroundAngle = 25f;
     [SerializeField, Range(0f, 90f)] float maxStairAngle = 50f;
@@ -49,6 +50,7 @@ public class MovingSphere : MonoBehaviour
     [CHCReadOnly] public int jumpingPhysicsStepsSinceLast;
     [CHCReadOnly] public int groundedPhysicsStepsSinceLast;
     [Space]
+    
     [Header(">> In Air")]
     [SerializeField, Range(0, 10)] int maxAirJumps;
     [SerializeField, Range(0f, 10f)] float jumpHeight = 2f;
@@ -56,16 +58,18 @@ public class MovingSphere : MonoBehaviour
     [CHCReadOnly] public int jumpPhase;
     [CHCReadOnly] public bool hasJumpInput;
     [Space]
+    
     [Header("SCRIPTABLE OBJECTS")]    
     [SerializeField] InputReader inputReader;
-    [CHCReadOnly] public Rigidbody body;
+    
+    Rigidbody body;
 
     bool OnGround => groundContactCount > 0;
     bool OnSteep => steepContactCount > 0;
     bool AirJumpingIsAllowed => maxAirJumps > 0;
     void OnEnable()
     {
-        inputReader.MoveInputEvent += vector => moveInputVector = vector;
+        inputReader.MoveInputEvent += vector => moveInput = vector;
         inputReader.JumpInputEvent += OnJumpInput;
         inputReader.JumpInputCancelledEvent += OnJumpInputCancelled;
     }
@@ -84,8 +88,8 @@ public class MovingSphere : MonoBehaviour
 
     void Update()
     {
-        moveInputVector = Vector2.ClampMagnitude(moveInputVector, maxLength: 1f);
-        desiredVelocity = new Vector3(moveInputVector.x, 0f, moveInputVector.y) * maxSpeed;
+        moveInput = Vector2.ClampMagnitude(moveInput, maxLength: 1f);
+        desiredVelocity = new Vector3(moveInput.x, 0f, moveInput.y) * maxSpeed;
     }
 
     void FixedUpdate()
