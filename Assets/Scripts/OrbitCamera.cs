@@ -1,5 +1,5 @@
 ﻿/*
- * Original code by Jasper Flick. Catlike Coding. 2019. https://catlikecoding.com/unity/tutorials/movement
+ * Original code by Jasper Flick. Catlike Coding. Published: 26 January, 2020. Updated: 16 July, 2020. https://catlikecoding.com/unity/tutorials/movement
  * Original code licensed under the MIT-0 license:      https://catlikecoding.com/unity/tutorials/license/
  * BitBucket repos at:
  *     Part 4: Orbit Camera          - https://bitbucket.org/catlikecodingunitytutorials/movement-04-orbit-camera/src/master/
@@ -11,7 +11,7 @@
  *    Part 10: Reactive Environment  - https://bitbucket.org/catlikecodingunitytutorials/movement-10-reactive-environment/src/master/
  *    Part 11: Rolling               - https://bitbucket.org/catlikecodingunitytutorials/movement-11-rolling/src/master/
  * 
- * Adapted and modified by Christian Holm Christensen. October 19th, 2022. 
+ * Adapted and modified by Christian Holm Christensen. October 19, 2022. 
 */
 
 using System;

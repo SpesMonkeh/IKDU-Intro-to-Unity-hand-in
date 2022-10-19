@@ -14,7 +14,7 @@
  *    Part 10: Reactive Environment  - https://bitbucket.org/catlikecodingunitytutorials/movement-10-reactive-environment/src/master/
  *    Part 11: Rolling               - https://bitbucket.org/catlikecodingunitytutorials/movement-11-rolling/src/master/
  * 
- * Adapted and modified by Christian Holm Christensen. October 19th, 2022. 
+ * Adapted and modified by Christian Holm Christensen. October 19, 2022. 
 */
 
 using CHCEditorTools;
