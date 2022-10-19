@@ -1,5 +1,5 @@
 ﻿using System;
-using EditorTools;
+using CHCEditorTools;
 using UnityEngine;
 using UnityEngine.InputSystem;
 

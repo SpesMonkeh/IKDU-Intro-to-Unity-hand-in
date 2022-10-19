@@ -14,7 +14,8 @@
  * Adapted and modified by Christian Holm Christensen. October 19th, 2022. 
 */
 
-using EditorTools;
+using System;
+using CHCEditorTools;
 using UnityEngine;
 
 [RequireComponent(typeof(Camera))]
@@ -40,12 +41,15 @@ public class OrbitCamera : MonoBehaviour
 	[SerializeField] LayerMask obstructionMask = -1;
 	[CHCReadOnly] public float lastManualRotationTime;
 	[CHCReadOnly] public Vector2 mouseInput;
+	[CHCReadOnly] public Quaternion gravityAlignment = Quaternion.identity;
+	[CHCReadOnly] public Quaternion orbitAngleRotation;
 
 	[Header("SCRIPTABLE OBJECTS")]    
 	[SerializeField] InputReader inputReader;
 
 	Camera regularCamera;
-
+	
+	bool ItIsTimeToRotateCamera => Time.unscaledTime - lastManualRotationTime >= alignmentDelay;
 	Vector3 CameraHalfExtends
 	{
 		get
@@ -73,25 +77,30 @@ public class OrbitCamera : MonoBehaviour
 	{
 		regularCamera = GetComponent<Camera>();
 		focusPoint = focusObject.position;
-		transform.localRotation = Quaternion.Euler(orbitAngles);
+		
+		transform.localRotation = orbitAngleRotation = Quaternion.Euler(orbitAngles);
 	}
 
 	void LateUpdate()
 	{
+		UpdateCameraWithGravitationalAlignment(out gravityAlignment);
 		UpdateFocusPoint();
-		Quaternion lookRotation;
 
 		if (ManualRotation() || AutomaticRotation())
 		{
 			ConstrainOrbitAngles();
-			lookRotation = Quaternion.Euler(orbitAngles);
+			orbitAngleRotation = Quaternion.Euler(orbitAngles);
 		}
-		else
-			lookRotation = transform.localRotation;
-
+		Quaternion lookRotation = gravityAlignment * orbitAngleRotation;
+		
 		CheckForOrbitObstruction(in lookRotation, out Vector3 lookPosition);
 		
 		transform.SetPositionAndRotation(lookPosition, lookRotation);
+	}
+
+	void UpdateCameraWithGravitationalAlignment(out Quaternion gravityAlign)
+	{
+		gravityAlign = Quaternion.FromToRotation(gravityAlignment * Vector3.up, CustomGravity.GetUpAxis(focusPoint)) * gravityAlignment;
 	}
 
 	void CheckForOrbitObstruction(in Quaternion lookRotation, out Vector3 lookPosition)
@@ -160,26 +169,26 @@ public class OrbitCamera : MonoBehaviour
 		}
 	}
 
+	float GetMovementDeltaSquared(out Vector2 movement)
+	{
+		Vector3 alignedDelta = Quaternion.Inverse(gravityAlignment) * (focusPoint - previousFocusPoint);
+		movement = new Vector2(
+			x: alignedDelta.x,
+			y: alignedDelta.z);
+		return movement.sqrMagnitude;
+	}
+
 	bool AutomaticRotation()
 	{
-		if (Time.unscaledTime - lastManualRotationTime < alignmentDelay) return false;
+		if (!ItIsTimeToRotateCamera) return false;
 
-		Vector2 movement = new(
-			focusPoint.x - previousFocusPoint.x,
-			focusPoint.z - previousFocusPoint.z);
-		float movementDeltaSquared = movement.sqrMagnitude;
+		float movementDeltaSquared = GetMovementDeltaSquared(out Vector2 movement);
+		bool hasTinyMovementChange = movementDeltaSquared < .0001f;
+		if (hasTinyMovementChange) return false;
 
-		if (movementDeltaSquared < .0001f) return false;
+		GetHeadingAngle(out float headingAngle, movementDeltaSquared, movement);
+		GetRotationChange(out float rotationChange, movementDeltaSquared, headingAngle);
 
-		float headingAngle = GetAngle(movement / Mathf.Sqrt(movementDeltaSquared));
-		float deltaAbsolute = Mathf.Abs(Mathf.DeltaAngle(orbitAngles.y, headingAngle));
-		float rotationChange = rotationSpeed * Mathf.Min(Time.unscaledDeltaTime, movementDeltaSquared);
-
-		if (deltaAbsolute < alignmentSmoothRange)
-			rotationChange *= deltaAbsolute / alignmentSmoothRange;
-		else if (180f - deltaAbsolute < alignmentSmoothRange)
-			rotationChange *= (180f - deltaAbsolute) / alignmentSmoothRange;
-		
 		orbitAngles.y = Mathf.MoveTowardsAngle(orbitAngles.y, headingAngle, rotationChange);
 		return true;
 	}
@@ -193,6 +202,21 @@ public class OrbitCamera : MonoBehaviour
 		lastManualRotationTime = Time.unscaledTime;
 		return true;
 	}
+
+	void GetRotationChange(out float rotationChange, float movementDeltaSquared, float headingAngle)
+	{
+		float deltaAbsolute = Mathf.Abs(Mathf.DeltaAngle(orbitAngles.y, headingAngle));
+		
+		rotationChange = rotationSpeed * Mathf.Min(Time.unscaledDeltaTime, movementDeltaSquared);
+		
+		if (deltaAbsolute < alignmentSmoothRange)
+			rotationChange *= deltaAbsolute / alignmentSmoothRange;
+		else if (180f - deltaAbsolute < alignmentSmoothRange)
+			rotationChange *= (180f - deltaAbsolute) / alignmentSmoothRange;
+	}
+	
+	static void GetHeadingAngle(out float headingAngle, float movementDeltaSquared, Vector2 movement)
+		=> headingAngle = GetAngle(movement / Mathf.Sqrt(movementDeltaSquared));
 
 	static float GetAngle(Vector2 direction)
 	{

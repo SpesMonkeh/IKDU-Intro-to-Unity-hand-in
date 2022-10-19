@@ -17,7 +17,7 @@
  * Adapted and modified by Christian Holm Christensen. October 19th, 2022. 
 */
 
-using EditorTools;
+using CHCEditorTools;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody))]
@@ -44,9 +44,10 @@ public class MovingSphere : MonoBehaviour
     [SerializeField, Min(0f)] float snapToGroundProbeDistance = 1f;
     [SerializeField] LayerMask groundProbeMask = -1;
     [SerializeField] LayerMask stairProbeMask = -1;
-    [Space]
 
+    [Space]
     [Header(">> Physics")]
+    [CHCReadOnly] public Vector3 gravity;
     [CHCReadOnly] public Vector3 upAxis;
     [CHCReadOnly] public Vector3 rightAxis;
     [CHCReadOnly] public Vector3 forwardAxis;
@@ -88,12 +89,13 @@ public class MovingSphere : MonoBehaviour
     void Awake()
     {
         body = GetComponent<Rigidbody>();
+        body.useGravity = false;
         OnValidate();
     }
 
     void Update()
     {
-        moveInput = Vector2.ClampMagnitude(moveInput, maxLength: 1f);
+        LimitMoveInputVectorLength();
 
         if (playerInputSpace)
         {
@@ -110,26 +112,32 @@ public class MovingSphere : MonoBehaviour
 
     void FixedUpdate()
     {
-        upAxis = -Physics.gravity.normalized;
+        gravity = CustomGravity.GetGravity(body.position, out upAxis);
         
         UpdateState();
-        AdjustVelocity();
-        HandleJumping();
         
-        body.velocity = velocity;
+        UpdateVelocity();
+        CheckIfShouldJump();
+        UpdateRigidBodyVelocity();
         
         ClearState();
     }
 
+    void UpdateRigidBodyVelocity()
+    {
+        velocity += gravity * Time.deltaTime;
+        body.velocity = velocity;
+    }
+    
     void ClearState()
     {
-        groundContactCount = 0;
-        steepContactCount = 0;
-        
-        groundContactNormal = Vector3.zero;
-        steepContactNormal= Vector3.zero;
+        ResetContactCounts();
+        ResetContactNormals();
     }
 
+    void ResetContactCounts() => steepContactCount = groundContactCount = 0;
+    void ResetContactNormals() => steepContactNormal = groundContactNormal = Vector3.zero;
+    
     void UpdateState()
     {
         groundedPhysicsStepsSinceLast += 1;
@@ -149,13 +157,10 @@ public class MovingSphere : MonoBehaviour
             groundContactNormal = upAxis;
     }
 
-
-    void HandleJumping()
+    void CheckIfShouldJump()
     {
         if (!hasJumpInput) return;
-        
         hasJumpInput = false;
-        
         Jump();
     }
 
@@ -181,7 +186,7 @@ public class MovingSphere : MonoBehaviour
         jumpingPhysicsStepsSinceLast = 0;
         jumpPhase += 1;
         
-        float jumpSpeed = Mathf.Sqrt(2f * Physics.gravity.magnitude * jumpHeight);
+        float jumpSpeed = Mathf.Sqrt(2f * gravity.magnitude * jumpHeight);
         
         jumpDirection = (jumpDirection + upAxis).normalized;
         float alignedSpeed = Vector3.Dot(velocity, jumpDirection);
@@ -195,7 +200,7 @@ public class MovingSphere : MonoBehaviour
     void CheckForFalseLanding() => jumpPhase = jumpingPhysicsStepsSinceLast > 1 ? 0 : jumpPhase;
     void PreventExtraJumpAfterSurfaceFall() => jumpPhase = jumpPhase == 0 ? 1 : jumpPhase;
 
-    void AdjustVelocity()
+    void UpdateVelocity()
     {
         Vector3 xAxis = ProjectDirectionOnPlane(rightAxis, groundContactNormal);
         Vector3 zAxis = ProjectDirectionOnPlane(forwardAxis, groundContactNormal);
@@ -271,6 +276,8 @@ public class MovingSphere : MonoBehaviour
         }
     }
     
+    void LimitMoveInputVectorLength() => moveInput = Vector2.ClampMagnitude(moveInput, maxLength: 1f);
+
     void GetUpDotProduct(out float upDot, Vector3 rhs) => upDot = GetUpDotProduct(rhs);
     float GetUpDotProduct(Vector3 rhs) => Vector3.Dot(upAxis, rhs);
 
