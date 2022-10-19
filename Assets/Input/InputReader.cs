@@ -2,15 +2,13 @@
 using EditorTools;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.Interactions;
 
-[CreateAssetMenu(fileName = "New Input Reader", menuName = "Project/Input Reader")]
+[CreateAssetMenu(menuName = "Project/Input Reader")]
 public class InputReader : ScriptableObject, PlayerControls.IPlayerActions
 {
 	[Header("DEBUG")]
 	[CHCReadOnly, SerializeField] Vector2 moveInput;
 	[CHCReadOnly, SerializeField] Vector2 mouseInput;
-
 
 	PlayerControls playerControls;
 	
@@ -49,6 +47,8 @@ public class InputReader : ScriptableObject, PlayerControls.IPlayerActions
 
 	public void OnFire(InputAction.CallbackContext context)
 	{
+		Cursor.visible = !Cursor.visible;
+		Cursor.lockState = Cursor.visible ? CursorLockMode.None : CursorLockMode.Locked;
 	}
 
 	public void OnJump(InputAction.CallbackContext context)

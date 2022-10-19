@@ -14,7 +14,7 @@
  *    Part 10: Reactive Environment  - https://bitbucket.org/catlikecodingunitytutorials/movement-10-reactive-environment/src/master/
  *    Part 11: Rolling               - https://bitbucket.org/catlikecodingunitytutorials/movement-11-rolling/src/master/
  * 
- * Adapted and modified by Christian Holm Christensen. October 16th, 2022. 
+ * Adapted and modified by Christian Holm Christensen. October 19th, 2022. 
 */
 
 using EditorTools;
@@ -29,11 +29,9 @@ public class MovingSphere : MonoBehaviour
     [SerializeField, Range(0f, 100f)] float maxSpeed = 10f;
     [SerializeField, Range(0f, 100f)] float maxGroundAcceleration = 10f;
     [CHCReadOnly] public int groundContactCount;
-    [CHCReadOnly] public Vector2 moveInput;
     [CHCReadOnly] public Vector3 desiredVelocity;
     [CHCReadOnly] public Vector3 velocity;
     [CHCReadOnly] public Vector3 groundContactNormal;
-    
     [Header(">>> Movement Angles")]
     [SerializeField, Range(0f, 90f)] float maxGroundAngle = 25f;
     [SerializeField, Range(0f, 90f)] float maxStairAngle = 50f;
@@ -41,12 +39,17 @@ public class MovingSphere : MonoBehaviour
     [CHCReadOnly] public float minGroundDotProduct;
     [CHCReadOnly] public float minStairDotProduct;
     [CHCReadOnly] public Vector3 steepContactNormal;
-
     [Header(">>> Snap To Ground")]
     [SerializeField, Range(0f, 100f)] float maxSnapToGroundSpeed = 100f;
     [SerializeField, Min(0f)] float snapToGroundProbeDistance = 1f;
     [SerializeField] LayerMask groundProbeMask = -1;
     [SerializeField] LayerMask stairProbeMask = -1;
+    [Space]
+
+    [Header(">> Physics")]
+    [CHCReadOnly] public Vector3 upAxis;
+    [CHCReadOnly] public Vector3 rightAxis;
+    [CHCReadOnly] public Vector3 forwardAxis;
     [CHCReadOnly] public int jumpingPhysicsStepsSinceLast;
     [CHCReadOnly] public int groundedPhysicsStepsSinceLast;
     [Space]
@@ -56,13 +59,14 @@ public class MovingSphere : MonoBehaviour
     [SerializeField, Range(0f, 10f)] float jumpHeight = 2f;
     [SerializeField, Range(0f, 100f)] float maxAirAcceleration = 1f;
     [CHCReadOnly] public int jumpPhase;
-    [CHCReadOnly] public bool hasJumpInput;
 
     [Space]
     [Header("INPUT")]
     [SerializeField] Transform playerInputSpace;
     [SerializeField] InputReader inputReader;
-    
+    [CHCReadOnly] public bool hasJumpInput;
+    [CHCReadOnly] public Vector2 moveInput;
+
     Rigidbody body;
 
     bool OnGround => groundContactCount > 0;
@@ -93,22 +97,21 @@ public class MovingSphere : MonoBehaviour
 
         if (playerInputSpace)
         {
-            Vector3 forward = playerInputSpace.forward;
-            forward.y = 0f;
-            forward.Normalize();
-
-            Vector3 right = playerInputSpace.right;
-            right.y = 0f;
-            right.Normalize();
-            
-            desiredVelocity = (forward * moveInput.y + right * moveInput.x) * maxSpeed;
+            rightAxis = ProjectDirectionOnPlane(playerInputSpace.right, upAxis);
+            forwardAxis = ProjectDirectionOnPlane(playerInputSpace.forward, upAxis);
         }
-        else 
-            desiredVelocity = new Vector3(moveInput.x, 0f, moveInput.y) * maxSpeed;
+        else
+        {
+            rightAxis = ProjectDirectionOnPlane(Vector3.right, upAxis);
+            forwardAxis = ProjectDirectionOnPlane(Vector3.forward, upAxis);
+        }
+        desiredVelocity = new Vector3(moveInput.x, 0f, moveInput.y) * maxSpeed;
     }
 
     void FixedUpdate()
     {
+        upAxis = -Physics.gravity.normalized;
+        
         UpdateState();
         AdjustVelocity();
         HandleJumping();
@@ -143,7 +146,7 @@ public class MovingSphere : MonoBehaviour
                 groundContactNormal.Normalize();
         }
         else
-            groundContactNormal = Vector3.up;
+            groundContactNormal = upAxis;
     }
 
 
@@ -178,9 +181,9 @@ public class MovingSphere : MonoBehaviour
         jumpingPhysicsStepsSinceLast = 0;
         jumpPhase += 1;
         
-        float jumpSpeed = Mathf.Sqrt(-2f * Physics.gravity.y * jumpHeight);
+        float jumpSpeed = Mathf.Sqrt(2f * Physics.gravity.magnitude * jumpHeight);
         
-        jumpDirection = (jumpDirection + Vector3.up).normalized;
+        jumpDirection = (jumpDirection + upAxis).normalized;
         float alignedSpeed = Vector3.Dot(velocity, jumpDirection);
         
         if(alignedSpeed > 0f)
@@ -194,8 +197,8 @@ public class MovingSphere : MonoBehaviour
 
     void AdjustVelocity()
     {
-        Vector3 xAxis = ProjectOnContactPlane(Vector3.right).normalized;
-        Vector3 zAxis = ProjectOnContactPlane(Vector3.forward).normalized;
+        Vector3 xAxis = ProjectDirectionOnPlane(rightAxis, groundContactNormal);
+        Vector3 zAxis = ProjectDirectionOnPlane(forwardAxis, groundContactNormal);
         
         float currentX = Vector3.Dot(velocity, xAxis);
         float currentZ = Vector3.Dot(velocity, zAxis);
@@ -216,8 +219,9 @@ public class MovingSphere : MonoBehaviour
         float speed = velocity.magnitude;
         if (speed > maxSnapToGroundSpeed) return false;
         
-        if (!Physics.Raycast(body.position, Vector3.down, out RaycastHit hit, snapToGroundProbeDistance, groundProbeMask)) return false;
-        if (hit.normal.y < GetMinDotProduct(hit.collider.gameObject.layer)) return false;
+        if (!Physics.Raycast(body.position, -upAxis, out RaycastHit hit, snapToGroundProbeDistance, groundProbeMask)) return false;
+        
+        if (GetUpDotProduct(hit.normal) < GetMinDotProduct(hit.collider.gameObject.layer)) return false;
         
         groundContactCount = 1;
         groundContactNormal = hit.normal;
@@ -225,29 +229,21 @@ public class MovingSphere : MonoBehaviour
         float dot = Vector3.Dot(velocity, hit.normal);
         if(dot > 0f)
             velocity = (velocity - hit.normal * dot).normalized * speed;
-        
         return true;
     }
 
     bool CheckSteepContacts()
     {
-        if (steepContactCount > 1)
-        {
-            steepContactNormal.Normalize();
-            if (steepContactNormal.y >= minGroundDotProduct)
-            {
-                groundContactCount = 1;
-                groundContactNormal = steepContactNormal;
-                return true;
-            }
-        }
+        if (steepContactCount <= 1) return false;
+        
+        steepContactNormal.Normalize();
 
-        return false;
+        if (!(GetUpDotProduct(steepContactNormal) >= minGroundDotProduct)) return false;
+        
+        groundContactCount = 1;
+        groundContactNormal = steepContactNormal;
+        return true;
     }
-
-    float GetMinDotProduct(int layer) => (stairProbeMask & (1 << layer)) == 0 ? minGroundDotProduct : minStairDotProduct;
-
-    Vector3 ProjectOnContactPlane(Vector3 vector) => vector - groundContactNormal * Vector3.Dot(vector, groundContactNormal);
     
     void OnJumpInput() => hasJumpInput = true;
     void OnJumpInputCancelled() => hasJumpInput = false;
@@ -260,19 +256,28 @@ public class MovingSphere : MonoBehaviour
         for (int i = 0; i < collision.contactCount; i++)
         {
             Vector3 normal = collision.GetContact(i).normal;
-            if (normal.y >= minDotProduct)
+
+            GetUpDotProduct(out float upDot, normal);
+            if (upDot >= minDotProduct)
             {
                 groundContactCount += 1;
                 groundContactNormal += normal;
             }
-            else if (normal.y > -.01f)
+            else if (upDot > -.01f)
             {
                 steepContactCount += 1;
                 steepContactNormal += normal;
             }
         }
     }
+    
+    void GetUpDotProduct(out float upDot, Vector3 rhs) => upDot = GetUpDotProduct(rhs);
+    float GetUpDotProduct(Vector3 rhs) => Vector3.Dot(upAxis, rhs);
 
+    float GetMinDotProduct(int layer) => (stairProbeMask & (1 << layer)) == 0 ? minGroundDotProduct : minStairDotProduct;
+    
+    static Vector3 ProjectDirectionOnPlane(Vector3 direction, Vector3 normal) => (direction - normal * Vector3.Dot(direction, normal)).normalized;
+    
     void OnDisable()
     {
         inputReader.JumpInputEvent -= OnJumpInput;
