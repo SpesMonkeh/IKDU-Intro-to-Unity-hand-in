@@ -23,14 +23,19 @@ public class GravityPlane : GravitySource
 	
 	public override Vector3 GetGravity(Vector3 position)
 	{
-		
+		void LinearlyDecreaseGravity(ref float g, float distance) => g *= 1f - distance / gravitationalRange;
+
 		Vector3 up = ThisTransform.up;
 		float distance = Vector3.Dot(up, position - ThisTransform.position);
 		
 		if(distance > gravitationalRange)
 			return Vector3.zero;
+
+		float g = -gravity;
+		if (distance > 0f)
+			LinearlyDecreaseGravity(ref g, distance);
 		
-		return -gravity * up;
+		return g * up;
 	}
 
 
